@@ -23,7 +23,7 @@
 ## AddressSanitizer smoke test
 
 - Compile command: `clang++ -O0 -g -fsanitize=address -fno-omit-frame-pointer asan_test.cpp -o asan_test`
-- Result: Passed
+- Result: ASan detection check passed (expected stack-buffer-overflow was detected)
 - ASan report: `stack-buffer-overflow`
 - The test intentionally reads beyond the end of a one-element stack array.
 - Test source: `asan_test.cpp`
