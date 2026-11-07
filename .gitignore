@@ -1,1 +1,14 @@
-asan_test
+# Build outputs
+*.o
+*.out
+*.exe
+*.bin
+/build/
+/bin/
+
+# Compiled Workload C binaries
+/workload_c_normal
+/workload_c_asan
+/workload_c
+
+# Keep raw logs and CSV results if required for reproducibility.
