@@ -34,3 +34,15 @@ This smoke test verifies that AddressSanitizer works in this environment. It is 
 ## Difference from the paper's evaluation environment
 
 The paper evaluated SPEC CPU2006 in 64-bit Linux on an HP Z600 with two quad-core Intel Xeon E5620 CPUs and 24 GB of RAM. Our environment is different, and this difference must be considered when comparing results with the paper.
+
+## Week 2 workload smoke test
+
+- Date: 2026-11-08
+- Compiler: Ubuntu clang version 18.1.3 (1ubuntu1)
+- Input: 10000 iterations, 1024 bytes per block
+- Normal build: `clang++ -O2 workload_c.cpp -o workload_normal`
+- ASan build: `clang++ -O2 -g -fsanitize=address -fno-omit-frame-pointer workload_c.cpp -o workload_asan`
+- Normal run: exit code 0; checksum 1305600000; elapsed time 5780 us
+- ASan run: exit code 0; checksum 1305600000; elapsed time 41060 us
+- Outcome: Both builds completed successfully and produced the same checksum.
+- Limitation: This was one smoke-test run to check that both builds work. The times are not formal benchmark results.
