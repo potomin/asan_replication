@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Member 4: compile the ASan example and capture all 12 raw run logs.
+# Author: 陈婉仪 | Student ID: 1240002711
 # Run in WSL/Linux from the repository root: bash member4_run_demo.sh
 set -u
 set -o pipefail
