@@ -1,0 +1,4 @@
+iterations=100000
+bytes_per_block=1024
+elapsed_us=335609
+checksum=13056000000
