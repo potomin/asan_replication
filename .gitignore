@@ -3,6 +3,7 @@
 *.out
 *.exe
 *.bin
+
 /build/
 /bin/
 
@@ -11,4 +12,5 @@
 /workload_c_asan
 /workload_c
 
-# Keep raw logs and CSV results if required for reproducibility.
+# Third-party LLVM test-suite source files
+/third_party/llvm-test-suite/
