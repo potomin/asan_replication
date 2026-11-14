@@ -1,0 +1,13 @@
+test_case,index,repeat,exit_code,asan_report,error_category,reported_source_location,log_path,meets_expectation
+T1,0,1,0,no,none,not-reported,demo_results/logs/index_0_run_1.txt,yes
+T1,0,2,0,no,none,not-reported,demo_results/logs/index_0_run_2.txt,yes
+T1,0,3,0,no,none,not-reported,demo_results/logs/index_0_run_3.txt,yes
+T2,15,1,0,no,none,not-reported,demo_results/logs/index_15_run_1.txt,yes
+T2,15,2,0,no,none,not-reported,demo_results/logs/index_15_run_2.txt,yes
+T2,15,3,0,no,none,not-reported,demo_results/logs/index_15_run_3.txt,yes
+T3,16,1,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_16_run_1.txt,yes
+T3,16,2,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_16_run_2.txt,yes
+T3,16,3,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_16_run_3.txt,yes
+T4,17,1,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_17_run_1.txt,yes
+T4,17,2,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_17_run_2.txt,yes
+T4,17,3,1,yes,heap-buffer-overflow,asan_heap_demo.cpp:41,demo_results/logs/index_17_run_3.txt,yes

@@ -1,0 +1,56 @@
+test_case=T4 index=17 repeat=1
+command: ASAN_OPTIONS=halt_on_error=1:abort_on_error=0:detect_leaks=0:symbolize=1 /tmp/asan_replication_member4_1000/asan_heap_demo 17
+--- stdout and stderr ---
+Array length: 16
+Requested index: 17
+=================================================================
+==7673==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x506000000064 at pc 0x58c5a2c371a4 bp 0x7ffde4be0850 sp 0x7ffde4be0848
+READ of size 4 at 0x506000000064 thread T0
+    #0 0x58c5a2c371a3 in main /workspaces/asan_replication/asan_heap_demo.cpp:41:24
+    #1 0x717dd63041c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #2 0x717dd630428a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #3 0x58c5a2b5b3b4 in _start (/tmp/asan_replication_member4_1000/asan_heap_demo+0x2c3b4) (BuildId: f3a331f80ea360ddcc07ea3e0ff538f9061a8bd4)
+
+0x506000000064 is located 4 bytes after 64-byte region [0x506000000020,0x506000000060)
+allocated by thread T0 here:
+    #0 0x58c5a2c34941 in operator new[](unsigned long) (/tmp/asan_replication_member4_1000/asan_heap_demo+0x105941) (BuildId: f3a331f80ea360ddcc07ea3e0ff538f9061a8bd4)
+    #1 0x58c5a2c36fd6 in main /workspaces/asan_replication/asan_heap_demo.cpp:30:35
+    #2 0x717dd63041c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #3 0x717dd630428a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #4 0x58c5a2b5b3b4 in _start (/tmp/asan_replication_member4_1000/asan_heap_demo+0x2c3b4) (BuildId: f3a331f80ea360ddcc07ea3e0ff538f9061a8bd4)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /workspaces/asan_replication/asan_heap_demo.cpp:41:24 in main
+Shadow bytes around the buggy address:
+  0x505ffffffd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x505ffffffe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x505ffffffe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x505fffffff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x505fffffff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x506000000000: fa fa fa fa 00 00 00 00 00 00 00 00[fa]fa fa fa
+  0x506000000080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x506000000100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x506000000180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x506000000200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x506000000280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==7673==ABORTING
+
+--- process exit code: 1 ---

@@ -89,4 +89,22 @@ or kernel changes.
 ## Week 1 Status
 
 Experiment design completed.
-Implementation and execution are pending.
+
+Implementation and execution completed in GitHub Codespaces.
+
+The demonstration was executed in a cloud-based Linux environment (x86_64), not on a local WSL machine.
+
+Each test index (0, 15, 16, and 17) was executed three times, for a total of 12 runs.
+
+### Actual Results
+
+| Index | Runs | Exit Code | Observed ASan Result |
+|---|---:|---:|---|
+| 0 | 3 | 0 | No error detected |
+| 15 | 3 | 0 | No error detected |
+| 16 | 3 | 1 | heap-buffer-overflow |
+| 17 | 3 | 1 | heap-buffer-overflow |
+
+All 12 execution logs were generated and saved under demo_results/.
+
+The actual results and ASan reports are recorded separately from the expected outcomes.

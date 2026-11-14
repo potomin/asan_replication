@@ -1,0 +1,4 @@
+# Member 4 compilation log
+cwd: /workspaces/asan_replication
+command: clang++ -std=c++17 -O0 -g -fsanitize=address -fno-omit-frame-pointer /workspaces/asan_replication/asan_heap_demo.cpp -o /tmp/asan_replication_member4_1000/asan_heap_demo 
+compile_exit_code: 0

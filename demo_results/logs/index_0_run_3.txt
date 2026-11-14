@@ -1,0 +1,8 @@
+test_case=T1 index=0 repeat=3
+command: ASAN_OPTIONS=halt_on_error=1:abort_on_error=0:detect_leaks=0:symbolize=1 /tmp/asan_replication_member4_1000/asan_heap_demo 0
+--- stdout and stderr ---
+Array length: 16
+Requested index: 0
+Read succeeded; value: 100
+
+--- process exit code: 0 ---
