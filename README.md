@@ -600,3 +600,36 @@ The repository records WSL/Clang validation of all three programs in both modes 
 ## Formal script entry point
 
 After compilation and validation, run `bash scripts/run_benchmark.sh --runs 5 --output results/formal/formal_runs.csv`. Use a fresh output path for each data set and a separate parent directory to preserve its logs. The root-level `run_benchmark.sh` contains only whitespace in the reviewed snapshot. The script also records supplementary Max RSS, with VmPeak left blank. For the formal timing analysis select rows with `claim_id=C1`, `measurement_kind=time`, `phase=measured`, `valid=true`, and `pair_valid=true`.
+
+## Member 4: Extension Experiment — ASan Error Detection Demonstration
+
+### 1. Purpose
+
+This supplementary experiment demonstrates whether AddressSanitizer (ASan) can detect heap-buffer-overflow errors caused by out-of-bounds reads.
+
+The program allocates a heap array containing exactly 16 integers and tests four access indices: 0, 15, 16, and 17.
+
+### 2. Test Results
+
+Each test index was executed three times, resulting in 12 executions.
+
+| Test Index | Runs | Expected Result | Actual Result |
+|---|---:|---|---|
+| 0 | 3 | Valid access | No error detected |
+| 15 | 3 | Valid access | No error detected |
+| 16 | 3 | Heap-buffer-overflow | Heap-buffer-overflow |
+| 17 | 3 | Heap-buffer-overflow | Heap-buffer-overflow |
+
+All observed results matched the expected outcomes.
+
+### 3. Execution Environment
+
+The recorded demonstration was executed in GitHub Codespaces using a cloud-based Linux x86_64 environment, not on a local WSL machine.
+
+### 4. How to Reproduce
+
+Run the following command from the repository root:
+
+```bash
+bash member4_run_demo.sh
+```

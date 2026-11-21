@@ -40,7 +40,9 @@ Keep the following unchanged:
 - Hardware and operating system
 - Compiler version and compilation options
 - ASan runtime configuration
+**Actual execution conditions (Week 1):**
 
+All 12 runs were performed in the same GitHub Codespaces environment (Linux, x86_64), using the same compiler version, compilation options, and ASan runtime configuration.
 ## Test Cases
 
 | Case | Array length | Index | Expected behavior |
@@ -60,7 +62,9 @@ These are expectations, not measured results.
 4. Run each case at least three times.
 5. Save the command, output, error report, and exit code for every run.
 6. Compare observed behavior with the expected behavior.
+**Actual execution note (Week 1):**
 
+The planned procedure referred to the environment documented by Member 2. However, the Week 1 demonstration was actually executed in GitHub Codespaces (Linux, x86_64), not in the local WSL environment. The actual compiler, runtime, and environment details are recorded in `demo_results/environment.md`.
 ## Measurements
 
 Record:

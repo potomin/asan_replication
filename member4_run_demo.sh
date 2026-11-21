@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Author: 陈婉仪 | Student ID: 1240002711
-# Run in WSL/Linux from the repository root: bash member4_run_demo.sh
+# Run from the repository root in GitHub Codespaces (Linux) or WSL/Linux.
 set -u
 set -o pipefail
 
@@ -23,7 +23,7 @@ if command -v clang++ >/dev/null 2>&1; then
 elif command -v g++ >/dev/null 2>&1; then
     CXX=g++
 else
-    echo 'ERROR: Neither clang++ nor g++ was found. Install a C++ compiler in WSL.' >&2
+    echo 'ERROR: Neither clang++ nor g++ was found. Install a C++ compiler in the current Linux environment.' >&2
     exit 2
 fi
 
@@ -151,7 +151,7 @@ done
     echo
     echo '## 3. How to reproduce'
     echo
-    echo 'Run `bash member4_run_demo.sh` from the project root in WSL/Linux.'
+    echo 'Run `bash member4_run_demo.sh` from the project root in GitHub Codespaces (Linux) or WSL/Linux.'
     echo 'See `demo_results/environment.md` for compiler, options, source hash, and the exact build command.'
     echo 'See `demo_results/build.txt` for build output and compile exit code.'
     echo 'Every `demo_results/logs/index_*_run_*.txt` records the executed command,'
@@ -161,7 +161,7 @@ done
     echo
     echo 'This is a controlled heap out-of-bounds *read* demonstration, not a SPEC CPU2006 benchmark.'
     echo "It tests four selected indices only; it does not measure the paper's runtime or memory overhead."
-    echo 'Results refer to the specific compiler, runtime, and host stated in `environment.md`.'
+    echo 'Results refer to the specific compiler, runtime, and host recorded in demo_results/environment.md.'
 } > "$RESULTS/expected_vs_actual.md"
 
 if grep -q ',no$' "$CSV"; then
