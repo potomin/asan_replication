@@ -1,493 +1,62 @@
-# AddressSanitizer: Reproduction Plan
+# AddressSanitizer — Partial Reproduction
 
-**Role:** 王一涵1240012912
-**Revised:** 27 October 2026
-**Status:** Week\-one plan; no experimental results reported\.
+Updated 22 November 2026. Member 1 — Wang Yihan (王一涵), 1240012912.
 
-## Paper and research question
+## Project and final scope
 
-K\. Serebryany, D\. Bruening, A\. Potapenko and D\. Vyukov, *AddressSanitizer: A Fast Address Sanity Checker*, USENIX ATC 12 &#40;2012&#41;, pp\. 309\-318\.
+This Operating Systems project studies *AddressSanitizer: A Fast Address Sanity Checker* (Serebryany et al., USENIX ATC 2012). We evaluate runtime overhead on three publicly available C benchmarks and explain selected memory-error detection behavior through controlled tests.
 
-Can C/C\+\+ memory\-access errors be detected with manageable runtime and memory overhead? ASan combines compiler checks, shadow memory, redzones and delayed reuse of freed memory\.
+The paper uses SPEC CPU2006. Our group lacks access to a licensed copy and therefore selects LLVM test-suite's `ary3.c`, `heapsort.c`, and `matrix.c`. These upstream sources are used with their original notices. This is a partial reproduction using substitute workloads and a modern compiler/runtime.
 
-## Selected scope: exactly two claims
-
-|ID|One source figure/table|Selected paper claim                                                                        |Planned evidence                                                                             |
-|--|-----------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-|C1|Figure 2, PDF p. 7     |Reads-and-writes instrumentation has reported average runtime 1.73x baseline (73% overhead).|Paired baseline/ASan times and time ratios, as mean ± sample SD.                             |
-|C2|Table 1, PDF p. 6      |Memory overhead is reported as 3.37x overall, using VmPeak under the paper’s settings.      |Paired VmPeak measurements and ratios, as mean ± sample SD; qualify historical comparability.|
-
-Writes\-only performance and bug\-detection coverage are outside scope\. Subsets or substitutes are partial reproduction\. Table 1’s printed totals give `24467/8171 = 2.994x`, not its reported `3.37x`; preserve both and resolve the original normalization before claiming an exact match\.
-
-## Experiment protocol
-
-1. Fix workload/source revision, input/hash, expected output and configuration\. Record OS, CPU, RAM, compiler/runtime, commands and ASan settings\. Prefer original SPEC CPU2006 workloads where available\.
-2. Use identical inputs, dependencies, architecture and `-O2` for baseline and ASan builds; add `-fsanitize=address` at compilation/linking for ASan\. The paper used 64\-bit Linux, 32\-byte redzones, disabled malloc/free stack unwinding and zero quarantine\. Record deviations and additional checks\.
-3. Use one unreported warm\-up per variant, then **at least five valid pairs per workload/input/configuration and measurement kind**, in fresh processes\. Alternate run order\. Separate timing and memory runs if collection affects timing\.
-4. Require correct outputs, successful exits and valid metrics\. Keep failed\-run reasons and collect replacement pairs; missing data are never zero\.
-
-## Statistics: mean ± sample standard deviation
-
-```text
-mean(x) = sum(x_i) / n
-SD(x) = sqrt(sum((x_i - mean(x))^2) / (n - 1))
-r_i = time_ASan,i / time_baseline,i
-q_i = VmPeak_ASan,i / VmPeak_baseline,i
-```
-
-Report each variant’s time &#40;seconds&#41; and VmPeak &#40;MiB&#41; as **mean ± SD**, with valid `n`\. Report paired ratios as `mean(r) ± SD(r)` and `mean(q) ± SD(q)`\. Runtime overhead is `100*(mean(r)-1)%`, with SD `100*SD(r)` percentage points\. Median and range are supplementary only\. SD is not standard error or a confidence interval\.
-
-Never pool different workloads\. For K workloads repeated in each round, define `S_i = sum(r_j,i)/K` and report `mean(S) ± SD(S)` across rounds\. Document this chosen aggregation rather than assuming the paper used it\. Do not substitute ratios of means or medians for these paired ratios\.
-
-## Shared memory contract for Members 1 and 3
-
-- **Required:** `vmpeak_kib`, peak virtual memory, for C2/Table 1\.
-- **Optional:** `max_rss_kib`, maximum resident set size, as a separate supplementary column\. **Max RSS is not VmPeak and cannot be converted into it\.**
-- Capture VmPeak inside the benchmark at a documented checkpoint before normal exit, using the same hook in both builds\. Read `/proc/self/status` there; external collectors use `/proc/<benchmark_pid>/status`\. Polling results must record interval/coverage and be labeled as observed lower bounds that can miss the final peak\.
-- Preserve raw values/units\. Normalize Linux status kB to KiB; report `MiB = KiB/1024`\. Linux `getrusage().ru_maxrss` is in KiB; check other collectors\. Keep process scope identical\. Verify the paper’s MB convention before absolute\-value comparisons\.
-- Keep existing Max RSS values separate\. Add `vmpeak_kib`; mark RSS\-only rows `needs_vmpeak_rerun` and leave VmPeak missing\. Collect five valid memory pairs before C2 summaries\. Updating the original Member 3 table and collecting missing data remain pending; that table was not supplied here\.
-- Current 64\-bit ASan maps very large virtual address ranges\. VmPeak is not physical RAM; matching metric names alone does not establish comparability with the 2012 runtime\.
-
-## Data format and delivery
-
-Raw CSV header; one row per variant, pair and measurement kind:
-
-```csv
-claim_id,workload_id,input_id,config_id,measurement_kind,pair_id,variant,elapsed_s,vmpeak_kib,max_rss_kib,valid,exit_code,collector,capture_scope,notes
-```
-
-Use `measurement_kind=time|memory` and `variant=baseline|asan`; link configuration/input IDs to recorded settings/hashes\. Summaries must contain separate mean, SD and valid\-count columns for time, VmPeak and paired ratios; optional Max RSS stays separate\.
-# AddressSanitizer: Partial Reproduction with Selected LLVM Benchmarks
-
-Member 1: Wang Yihan (王一涵)  
-Deliverable: workload selection and installation/build/run documentation  
-Updated: 7 November 2026
-
-## 1. Original evaluation and our final workload decision
-
-This project studies **AddressSanitizer: A Fast Address Sanity Checker**, by Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitry Vyukov (USENIX ATC 2012).
-
-Section 4 evaluates AddressSanitizer using C and C++ programs from **SPEC CPU2006**. The baseline uses regular LLVM/Clang with `-O2`. The original machine runs 64-bit Linux and has two quad-core Intel Xeon E5620 processors and 24 GB RAM. The study also uses historical runtime settings, including 32-byte redzones, disabled allocation/deallocation stack unwinding, and a zero-sized quarantine.
-
-**Our group does not currently have access to an authorized copy of SPEC CPU2006.** SPEC distributes this suite under a license agreement; authorized access normally requires a purchased license or an applicable institutional license. This records our group's access constraint, not a verified claim that the university owns no license.
-
-**Final decision:** use three publicly distributed C benchmarks from **LLVM test-suite, `SingleSource/Benchmarks/Shootout`**, as the main substitute workload: **`ary3`, `heapsort`, and `matrix`**. Keep Member 3's **`workload_c.cpp`** for environment smoke testing and optional supplementary measurements. The self-written program is no longer our only formal workload.
-
-The LLVM test-suite provides public program sources and reference outputs. The selected programs can be obtained without the SPEC suite. We use only the stated public programs, not `External/SPEC`. Preserve the upstream license and source notices, and do not present the upstream programs as code written by our group.
-
-**This is a partial reproduction with substitute workloads.** It retains the ordinary-build versus ASan-build comparison but changes the benchmarks, inputs, hardware, compiler version, and runtime configuration. Selecting three LLVM programs improves traceability and workload variety; it does not make this equivalent to SPEC CPU2006 or validate the paper's suite-wide numerical results. Acceptance of this reduced scope depends on the course requirements.
-
-| Item | Original paper | This project |
-| --- | --- | --- |
-| Main workloads | C/C++ programs from SPEC CPU2006 | Three selected LLVM test-suite C programs |
-| Supplementary workload | Not the group's custom program | `workload_c.cpp`, supplied by Member 3 |
-| Main inputs | SPEC benchmark inputs | Explicit arguments listed below |
-| Compiler and optimization | Historical LLVM/Clang, `-O2` | Installed Clang, `-O2` in both modes |
-| Runtime | Historical ASan configuration | Installed ASan; leak detection disabled and other options left at installed defaults |
-| Platform | Original Linux workstation | Group's 64-bit WSL/Ubuntu machine; actual details recorded |
-| Claim scope | SPEC suite evaluation | Per-program comparison on a small public subset |
-
-## 2. Selected programs and fixed inputs
-
-All three source files are in `SingleSource/Benchmarks/Shootout/` of the upstream repository. They originate from the Programming Language Shootout, as described in the upstream directory README and source headers.
-
-| Program | Source file | Behavior | Explicit run argument | Expected stdout |
-| --- | --- | --- | --- | --- |
-| `ary3` | `ary3.c` | Repeated integer-array accumulation | `1500000` (array length) | `1000 1500000000` |
-| `heapsort` | `heapsort.c` | Heap-sorts a deterministic array of doubles | `8000000` (number of elements) | `0.999993` |
-| `matrix` | `matrix.c` | Repeated multiplication of allocated 10-by-10 integer matrices | `3000000` (multiplication iterations) | `3355 13320 17865 23575` |
-
-These arguments match the selected revision's normal, non-`SMALL_PROBLEM_SIZE` defaults; we pass them explicitly to avoid ambiguity. No external input files are required. Use `LC_ALL=C` for stable numeric formatting. Each successful process must exit with code `0`.
-
-The three programs cover sequential array access, sorting, and matrix arithmetic. This remains a small selection of computational kernels, not a representative application suite. Allocation-heavy behavior is additionally explored by `workload_c.cpp`; keep that result separate from the three-program summary.
-
-We compile these three files directly rather than running the complete LLVM CMake/lit harness. This is a group-defined experiment using upstream benchmark sources, not an official full-suite LLVM test result. The supplied reference files end with an `exit 0` harness marker that is not program stdout; Section 5 shows how to remove that marker for direct comparison.
-
-## 3. Install tools and obtain a fixed source revision
-
-Run these commands from the group repository root in **64-bit Ubuntu under WSL**. WSL/Ubuntu must already be installed. Keep `workload_c.cpp` alongside this README. Use a fresh dependency directory for the clone commands; do not overwrite an existing local checkout with uncommitted work.
-
-```bash
-sudo apt-get update
-sudo apt-get install -y git clang build-essential time
-mkdir -p third_party build/plain build/asan results/smoke results/check expected
-
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/llvm/llvm-test-suite.git third_party/llvm-test-suite
-git -C third_party/llvm-test-suite sparse-checkout set \
-  SingleSource/Benchmarks/Shootout
-git -C third_party/llvm-test-suite fetch --depth 1 origin \
-  d3f64b96fe6176716771a2e172f799caf1239b5b
-git -C third_party/llvm-test-suite checkout --detach \
-  d3f64b96fe6176716771a2e172f799caf1239b5b
-git -C third_party/llvm-test-suite rev-parse HEAD
-```
-
-Pinned upstream commit: **`d3f64b96fe6176716771a2e172f799caf1239b5b`**. This revision and its source/reference files were inspected when preparing this README. Both modes must use this same checkout. Do not silently substitute a later `main` revision.
-
-The sparse checkout includes the upstream root `LICENSE.TXT`, the Shootout README, source notices, and reference files. Retain them. The upstream root license describes Apache 2.0 with LLVM exceptions and identifies separately licensed material; retain any applicable component notices as well. Fetching the dependency locally avoids copying an entire third-party repository into our group repository.
-
-Record the actual environment:
-
-```bash
-uname -a
-cat /etc/os-release
-lscpu
-free -h
-clang --version
-clang++ --version
-/usr/bin/time --version
-git rev-parse HEAD
-git -C third_party/llvm-test-suite rev-parse HEAD
-sha256sum workload_c.cpp
-sha256sum third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/ary3.c \
-  third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/heapsort.c \
-  third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/matrix.c
-```
-
-Put actual WSL/Ubuntu, CPU, RAM, compiler versions, repository revisions, source hashes, and runtime settings in `environment.md`. Do not substitute the paper's environment for ours.
-
-## 4. Common configuration and compilation
-
-Run all following command blocks in the same Bash session, or repeat these exports in each new session:
-
-```bash
-export LC_ALL=C
-export ASAN_OPTIONS=detect_leaks=0
-unset LSAN_OPTIONS
-```
-
-The selected experiment studies ASan address-checking overhead. `detect_leaks=0` explicitly disables the additional LeakSanitizer leak check, while retaining ASan address checks. Other sanitizer options use the installed runtime's defaults. This configuration is not a recreation of the 2012 runtime: in particular, the original redzone, stack-unwinding, and quarantine settings have not been reproduced. Record the complete setting for every run. Do not enable or disable options only for selected measured repetitions.
-
-### Main public benchmarks
-
-```bash
-for name in ary3 heapsort matrix; do
-  clang -std=c17 -O2 -g -fno-omit-frame-pointer \
-    "third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/${name}.c" \
-    -o "build/plain/${name}" -lm || break
-  clang -std=c17 -O2 -g -fno-omit-frame-pointer -fsanitize=address \
-    "third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/${name}.c" \
-    -o "build/asan/${name}" -lm || break
-done
-```
-
-Check that all six compilations succeeded before running. Use `clang` for these C sources and `clang++` for the custom C++ source. Common build flags are identical within each comparison; the instrumented build additionally uses `-fsanitize=address`. No special ASan exclusion lists or partial instrumentation are used.
-
-### Custom smoke-test program
-
-```bash
-clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer \
-  workload_c.cpp -o build/workload_plain
-clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer \
-  -fsanitize=address workload_c.cpp -o build/workload_asan
-```
-
-`workload_c.cpp` repeatedly allocates an unsigned-byte array, writes and reads its contents, accumulates a 64-bit checksum, and frees the array through `std::unique_ptr`. It prints `iterations`, `bytes_per_block`, `elapsed_us`, and `checksum`.
-
-Its interface is `[iterations] [bytes_per_block]`, with defaults `100000 1024`. Use positive decimal inputs; the current implementation is not a general input-validation tool. At `100000 1024`, the mathematically expected checksum is **`13056000000`**. The source SHA-256 is:
-
-```text
-7f2239176b890e74b5cf71415e4748a5b1ae46aa9c3d8eea165ba9915fe887c4
-```
-
-## 5. Validate the public benchmarks before measurement
-
-First prepare expected stdout from the upstream reference outputs:
-
-```bash
-for name in ary3 heapsort matrix; do
-  sed '/^exit 0$/d' \
-    "third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout/${name}.reference_output" \
-    > "expected/${name}.stdout.txt"
-done
-```
-
-The following block runs both modes once and records stdout, stderr, exit code, and output comparison status. It is a **validation pass**, not the formal five-run experiment. Run it in interactive Bash without `set -e` so failed processes still have their status saved.
-
-```bash
-for spec in ary3:1500000 heapsort:8000000 matrix:3000000; do
-  name=${spec%%:*}
-  input=${spec#*:}
-  for mode in plain asan; do
-    prefix="results/check/${name}.${mode}"
-    "./build/${mode}/${name}" "$input" \
-      > "${prefix}.stdout.txt" 2> "${prefix}.stderr.txt"
-    code=$?
-    printf '%s\n' "$code" > "${prefix}.exit.txt"
-    diff -u "expected/${name}.stdout.txt" "${prefix}.stdout.txt" \
-      > "${prefix}.diff.txt"
-    comparison=$?
-    printf '%s\n' "$comparison" > "${prefix}.compare-exit.txt"
-    printf '%s %s exit=%s comparison=%s\n' "$name" "$mode" "$code" "$comparison"
-  done
-done
-```
-
-Require process exit `0`, comparison status `0`, and no sanitizer-error report for every program in both modes. Inspect stderr as well as stdout. Do not treat matching output as proof of all-input correctness. Stop formal measurement and investigate any failure; do not remove a program solely because its ASan slowdown is large.
-
-## 6. Member 2: custom workload smoke test
-
-
-Run each binary once with exactly the same inputs. Run the blocks below in an interactive Bash session without `set -e`, so an unsuccessful process still has its exit code recorded.
-
-```bash
-./build/workload_plain 100000 1024 \
-  > results/smoke/plain.stdout.txt 2> results/smoke/plain.stderr.txt
-plain_exit=$?
-printf '%s\n' "$plain_exit" > results/smoke/plain.exit.txt
-
-./build/workload_asan 100000 1024 \
-  > results/smoke/asan.stdout.txt 2> results/smoke/asan.stderr.txt
-asan_exit=$?
-printf '%s\n' "$asan_exit" > results/smoke/asan.exit.txt
-
-cat results/smoke/plain.stdout.txt results/smoke/asan.stdout.txt
-cat results/smoke/plain.exit.txt results/smoke/asan.exit.txt
-cat results/smoke/plain.stderr.txt results/smoke/asan.stderr.txt
-```
-
-Expected successful behavior, to be checked against actual logs:
-
-- Both exit codes are `0`.
-- Both outputs report `iterations=100000` and `bytes_per_block=1024`.
-- Both checksums are `13056000000`.
-- No ASan memory-error report appears.
-- `elapsed_us` is measured separately and is not expected to match between runs.
-
-Matching checksums are a basic consistency check, not proof that all possible inputs are correct. This smoke test checks that the workload runs; **one run per build is not the formal performance experiment**.
-
-Member 2 must add a **工作负载试运行 / Workload smoke test** subsection to `environment.md`, containing the actual compilation commands, run commands, input values, stdout/stderr, exit codes, checksum comparison, and environment. Actual results must be distinguished from the expectations above.
-
-The shared configuration in Section 4 disables leak detection for this documented profile. If a different setting is tried, label that run separately and preserve the exact options. Member 2's original task remains the custom-program WSL smoke test; Member 3 must also validate the main public programs before formal measurements.
-
-## 7. Formal experiment and script requirements for Member 3
-
-### Research target and scope
-
-The primary target is the runtime-overhead comparison studied in the paper's **Figure 2**, evaluated here on the three selected LLVM programs. We report each program separately, not a claim that the paper's SPEC average has been reproduced.
-
-The paper's **Table 1** uses `VmPeak`, a different metric from Max RSS. Memory measurements are supplementary in the current plan. Unless target-process VmPeak collection is implemented and documented, mark the Table 1 reproduction as unavailable and report Max RSS under its own name.
-
-### Collection protocol
-
-1. Freeze the source commit, compiler/version, inputs in Section 2, flags, and runtime options before collecting data. Record input changes made during a pilot and restart the full measurement set afterward.
-2. Run at least one unmeasured warm-up for each program/mode combination. Warm-ups must pass output validation but must not enter the summary statistics.
-3. Collect at least **five valid runs for each of the three programs in each mode**: at least 30 valid measured executions, plus warm-ups. Alternate the order of plain/ASan within successive pairs and run sequentially on the same machine. Do not run these measurements in parallel.
-4. Save the exact invocation, program/mode, input, sequence/attempt number, warm-up status, runtime options, stdout, stderr, exit code, reference-output comparison status, elapsed time, and Max RSS. Use unique filenames for every attempt.
-5. A valid run exits `0`, matches the reference output, and has no sanitizer error. Retain invalid-attempt logs and exclusion reasons; collect replacements until at least five valid samples exist in each cell. Do not discard merely slow runs without a documented methodological reason.
-6. Use **whole-process elapsed time** consistently for the three public programs. Report valid `n`, arithmetic mean, and sample standard deviation (`n-1` denominator) for each program/mode. Never mix a custom program's internal `elapsed_us` with a public program's whole-process time.
-7. For each program, define `runtime_ratio = mean(ASan time) / mean(plain time)` and `overhead_percent = (runtime_ratio - 1) * 100`. If a combined summary is desired, additionally report the geometric mean of the three runtime ratios, label the three-program subset, and keep all individual results visible. Exclude the custom workload from this summary.
-
-For one measured execution, use this command form after the warm-ups. The example is the first plain `ary3` observation; Member 3's script must generalize it to every program, mode, repetition, validity check, and unique attempt number:
-
-```bash
-mkdir -p results/formal
-/usr/bin/time -f 'elapsed_s=%e\nmax_rss_kib=%M' \
-  -o results/formal/ary3.plain.run01.metrics.txt \
-  ./build/plain/ary3 1500000 \
-  > results/formal/ary3.plain.run01.stdout.txt \
-  2> results/formal/ary3.plain.run01.stderr.txt
-code=$?
-printf '%s\n' "$code" > results/formal/ary3.plain.run01.exit.txt
-diff -u expected/ary3.stdout.txt \
-  results/formal/ary3.plain.run01.stdout.txt \
-  > results/formal/ary3.plain.run01.diff.txt
-comparison=$?
-printf '%s\n' "$comparison" \
-  > results/formal/ary3.plain.run01.compare-exit.txt
-```
-
-GNU time `%e` has limited printed precision. If pilot timings are zero or too short to distinguish overhead reliably, use a documented higher-resolution whole-process timer consistently for both modes, or choose larger safe arguments and recompute/validate references before restarting measurements. Do not report ratios with a zero denominator. In particular, increasing `ary3` beyond the safe integer range can cause overflow; do not blindly scale its input.
-
-### Memory metrics and interpretation
-
-| Metric | Meaning | Current collection / restriction |
-| --- | --- | --- |
-| GNU time `elapsed_s` (`%e`) | Whole-process elapsed seconds | Main runtime comparison; includes process startup/shutdown |
-| Custom `elapsed_us` | Microseconds inside the custom program's loop | Supplementary only; excludes startup and final shutdown |
-| GNU time `max_rss_kib` (`%M`) | Peak resident memory in KiB on Linux | Available supplementary physical-memory metric |
-| `VmPeak` from `/proc/<target-pid>/status` | Peak virtual address-space size | Paper's Table 1 metric; not emitted by the selected original programs |
-
-**VmPeak and Max RSS must never share a column or label.** Reading `/proc/self/status` from the measuring shell measures the shell. Sampling a live target can miss a short-lived process; if used, state the sampling method and limitations. Program-side collection near termination is closer to the paper's method but changes the sources: document and apply the same instrumentation to both modes. If unavailable, use `N/A`, not `0`, for VmPeak. Modern ASan virtual-address reservations do not represent physical RAM consumption.
-
-The Excel template must separate program, mode, inputs, warm-up/validity status, elapsed time, Max RSS, and optional VmPeak, with units. Include mean and sample standard deviation for valid measured runs only. Member 3 must publish the actual script filename and invocation when their script is updated; this README does not invent an existing script path.
-
-### Files excluded from version control
-
-Member 3 should merge these entries into the repository's `.gitignore` while preserving existing rules:
-
-```gitignore
-/build/
-/third_party/llvm-test-suite/
-```
-
-Keep source code, this README, actual environment records, scripts, the Excel template, and the required raw experimental records in the group submission. Do not accidentally ignore all of `results/` if those logs are required. The dependency is reconstructible from the pinned commit and commands above; retain upstream notices if distributing copies.
-
-## 8. Verification status and reproduction limits
-
-The three public sources and their upstream reference outputs were inspected at the pinned commit. A separate local Linux/GCC 14.2.0 check compiled all three in plain and ASan modes using the common flags in Section 4, with `detect_leaks=0` for ASan. All six executions at the listed inputs exited `0`, produced the expected stdout in Section 2, and had empty stderr. This establishes a local feasibility check, **not** Member 2's WSL/Clang verification or formal statistical results. The Clang commands still need to run in the group's target environment.
-
-The custom source was also checked separately under Linux/GCC: both modes produced checksum `13056000000` with leak detection disabled for the successful ASan retry. An initial default-ASan attempt encountered a LeakSanitizer/ptrace environment error; it is not counted as a successful run. These checks provide no formal timings in this README.
-
-The scope remains limited by three small C programs, a synthetic supplementary C++ workload, different inputs/hardware, modern compiler optimization, modern ASan defaults, disabled leak detection, and whole-process timing. This cannot establish the original suite's 73% average slowdown or its 3.37x VmPeak increase. It does not validate every ASan bug-detection capability. Member 4's intentional-error demonstrations are a separate experiment.
-
-The workload choice and instructions are complete. WSL execution records, the updated formal run script, Excel results, and demonstration logs must be supplied by the responsible members after actual execution. Expected outputs and protocol descriptions must not be presented as collected data.
-
-## 9. Responsibilities and submission
-
-| Member | Deliverable |
+| Item | Final treatment |
 | --- | --- |
-| 1: Wang Yihan | This `README.md`: SPEC access constraint, exact public substitute selection, source provenance, partial-reproduction scope, and installation/build/run instructions |
-| 2: Cai Xiangmin | Actual WSL custom-workload smoke-test records in `environment.md`, including commands, options, outputs, exit codes, and checksum comparison |
-| 3: Guo Yifan | Existing custom source; adapt scripts and Excel to the three main public programs plus separately labeled supplementary runs; warm-ups, five valid runs per mode/program, metric separation, `.gitignore`, and real script usage |
-| 4: Chen Wanyi | Demonstration source and actual records for indices 0, 15, 16, 17, each run at least three times; expected and observed outcomes separated |
+| Figure 2 runtime comparison | Main quantitative objective; baseline and ASan whole-process elapsed seconds |
+| Max RSS | Supplementary peak resident-memory metric in KiB |
+| Table 1 VmPeak | Deferred; no VmPeak values are collected by the formal script |
+| Memory-error demonstrations | Functional evidence for selected heap and stack bounds errors |
+| Custom `workload_c.cpp` | Environment smoke test, separate from the three-program timing summary |
 
-Save this file as **`README.md`** in the repository root. If a repository README already exists, merge these sections while preserving unrelated required information. The group must align Member 3's scripts and Excel with this updated selection before collecting formal data. Member 2 can continue the already assigned custom-program smoke test.
+This document consolidates the project instructions and results into one current specification.
 
-## References
+## Paper method and experiment mapping
 
-1. Serebryany et al. *AddressSanitizer: A Fast Address Sanity Checker*. USENIX ATC 2012, Section 4, Figure 2 and Table 1. [Paper page](https://www.usenix.org/conference/atc12/technical-sessions/presentation/serebryany).
-2. SPEC. [CPU2006 legal notices](https://www.spec.org/cpu2006/docs/legal.html) and [ordering/licensing information](https://www.spec.org/order/).
-3. LLVM. [test-suite Guide](https://llvm.org/docs/TestSuiteGuide.html).
-4. LLVM test-suite. [Pinned source revision](https://github.com/llvm/llvm-test-suite/tree/d3f64b96fe6176716771a2e172f799caf1239b5b/SingleSource/Benchmarks/Shootout), including `README.txt`, `ary3.c`, `heapsort.c`, `matrix.c`, and their `.reference_output` files. [Upstream license](https://github.com/llvm/llvm-test-suite/blob/d3f64b96fe6176716771a2e172f799caf1239b5b/LICENSE.TXT).
-5. LLVM/Clang. [AddressSanitizer documentation](https://clang.llvm.org/docs/AddressSanitizer.html).
-6. Group-provided `workload_c.cpp` (Member 3), used for the smoke test and optional supplementary experiments.
-AddressSanitizer Runtime Overhead — Partial Reproduction
+ASan combines compiler-inserted access checks with shadow memory and a runtime library. The default shadow representation uses one shadow byte per aligned eight-byte application region. Redzones mark inaccessible memory around objects. Freed allocations are poisoned and delayed reuse through quarantine helps expose use-after-free. Diagnostics identify the invalid access and its context.
 
-Member 1: 王一涵 (Wang Yihan), 1240012912
-Status: Final experimental protocol. Formal WSL timing results are pending verification.
+| Paper component | Group experiment | Evidence and coverage |
+| --- | --- | --- |
+| Figure 2, runtime overhead | Three LLVM kernels, ordinary and ASan builds | Five valid measured pairs per kernel, with warm-ups excluded |
+| Table 1, virtual-memory overhead | VmPeak deferred | Max RSS retained under its own name |
+| Sections 3.3–3.4, bounds checking | Stack smoke test and 16-integer heap demonstration | Selected stack and heap errors have recorded reports |
+| Use-after-free and global bounds errors | Current tests focus on stack/heap bounds | Coverage remains incomplete |
+| Application deployment and tuning | Fixed small-workload configuration | Application-scale testing and parameter sweeps remain outside this evaluation |
 
-Scope and workload selection
+Detailed analysis is in [PAPER_REVIEW.md](PAPER_REVIEW.md).
 
-This project asks how enabling AddressSanitizer (ASan) changes whole-process elapsed time for three selected C programs. It follows the baseline-versus-ASan comparison in Figure 2 of Serebryany et al., AddressSanitizer: A Fast Address Sanity Checker (USENIX ATC 2012).
+## Workloads, source version and inputs
 
-The paper uses C/C++ benchmarks from SPEC CPU2006. Our group lacks access to a licensed copy, so we use the public LLVM test-suite Shootout programs listed below. This is a partial reproduction. The results apply to these programs, inputs, and the recorded WSL/Clang setup. The paper’s reported 73% average slowdown is historical context.
+LLVM test-suite commit `d3f64b96fe6176716771a2e172f799caf1239b5b` is the source revision. Files are under `SingleSource/Benchmarks/Shootout`.
 
-Formal metric: whole-process elapsed time in seconds. Memory evaluation is deferred. The paper’s Table 1 uses VmPeak (peak virtual address space). Any Max RSS already logged by a script is peak resident memory and stays outside the formal results. Member 4’s intentional-error demonstration is a separate deliverable.
-
-|Formal workload|Operation                    |Argument |Expected stdout         |
-|---------------|-----------------------------|--------:|------------------------|
-|`ary3`         |Integer-array accumulation   |`1500000`|`1000 1500000000`       |
-|`heapsort`     |Heap sort                    |`8000000`|`0.999993`              |
-|`matrix`       |Integer-matrix multiplication|`3000000`|`3355 13320 17865 23575`|
-
-Member 3’s workload_c.cpp is used for the WSL smoke test only. Its internal elapsed_us stays outside the formal timing analysis.
-
-Setup and build
-
-Run from the group repository root in 64-bit Ubuntu under WSL. The clone commands assume a fresh dependency directory. If the checkout already exists, reuse it after verifying its revision and checking that the selected files are unmodified.
-
-sudo apt-get update
-sudo apt-get install -y git clang build-essential time
-mkdir -p third_party build/plain build/asan expected
-
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/llvm/llvm-test-suite.git third_party/llvm-test-suite
-git -C third_party/llvm-test-suite sparse-checkout set SingleSource/Benchmarks/Shootout
-git -C third_party/llvm-test-suite fetch --depth 1 origin \
-  d3f64b96fe6176716771a2e172f799caf1239b5b
-git -C third_party/llvm-test-suite checkout --detach \
-  d3f64b96fe6176716771a2e172f799caf1239b5b
-git -C third_party/llvm-test-suite rev-parse HEAD
-
-Use the pinned revision printed above and retain its source and license notices. Record the repository and upstream revisions, WSL/Ubuntu version, CPU, RAM, Clang version, timing tool version, compile commands, and ASan settings in environment.md.
-
-Use the same source, compiler, and optimization flags in each pair. The ASan build adds -fsanitize=address. The runtime profile disables leak detection and uses the installed runtime’s defaults for the other options. Run the following in the same Bash session or repeat the exports before running either build.
-
-export LC_ALL=C
-export ASAN_OPTIONS=detect_leaks=0
-unset LSAN_OPTIONS
-src=third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout
-
-(
-  set -e
-  for name in ary3 heapsort matrix; do
-    clang -std=c17 -O2 -g -fno-omit-frame-pointer \
-      "$src/$name.c" -o "build/plain/$name" -lm
-    clang -std=c17 -O2 -g -fno-omit-frame-pointer -fsanitize=address \
-      "$src/$name.c" -o "build/asan/$name" -lm
-
-    # Remove the LLVM test harness's exit-status marker from expected stdout.
-    sed '/^exit 0$/d' "$src/$name.reference_output" > "expected/$name.stdout.txt"
-  done
-)
-
-Proceed after the build block succeeds for all three programs.
-
-Formal timing and validity
-
-1. Verify that both builds of each program exit successfully and match the expected output. Run at least one valid warm-up per program and build before collecting measured runs. Keep warm-up records outside the timing statistics.
-2. Collect at least five valid baseline/ASan pairs per program (at least 30 valid measured executions in total, plus warm-ups). Run fresh processes sequentially on the same machine. Alternate the order of the two builds across pairs.
-3. A measured run is valid when its exit code is 0, stdout exactly matches the upstream reference for the fixed input, stderr contains no ASan error report, and the recorded whole-process elapsed time is finite and positive. Both runs must pass for the pair to count. Save failed attempts with reasons and collect replacement pairs. Retain slow runs that meet the validity criteria.
-4. Record the program, input, mode, pair and attempt IDs, order, warm-up status, exact command, stdout, stderr, exit code, output comparison status, elapsed seconds, and validity or exclusion reason. Use a separate log prefix per execution. The script and Excel sheet should use the same definitions.
-5. Check timer resolution in the pilot. If GNU time rounds observations to zero or gives too little resolution for the workloads, use the same higher-resolution whole-process timer for the entire formal data set and document it in environment.md.
-
-Example for one measured execution. Run in Bash with errexit disabled so that a failing process or comparison still has its exit status logged. For the initial checks or warm-ups, use different log prefixes and leave them out of the summary.
-
-mkdir -p results/formal
-prefix=results/formal/ary3.pair01.attempt01.plain
-/usr/bin/time -f 'elapsed_s=%e' -o "$prefix.time.txt" \
-  ./build/plain/ary3 1500000 > "$prefix.stdout.txt" 2> "$prefix.stderr.txt"
-printf '%s\n' "$?" > "$prefix.exit.txt"
-diff -u expected/ary3.stdout.txt "$prefix.stdout.txt" > "$prefix.diff.txt"
-printf '%s\n' "$?" > "$prefix.compare-exit.txt"
-
-For each program, report valid pair count n and mean ± sample standard deviation of elapsed seconds for each build. Compute the ratio for each valid pair, then summarize the ratios for that program. A ratio above 1 indicates longer elapsed time with ASan. Keep the three programs’ results separate.
-
-ratio_i = ASan elapsed seconds_i / baseline elapsed seconds_i
-runtime overhead (%) = 100 × (mean of paired ratios − 1)
-sample SD denominator = n − 1
-
-Report the paired ratios as mean ± sample SD. If reporting the spread of overhead percentages, use 100 times the ratio SD, in percentage points.
-
-Custom workload smoke test
-
-On the same WSL setup, compile and run Member 3’s workload_c.cpp once per build using the common environment settings above.
-
-clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer \
-  workload_c.cpp -o build/workload_plain
-clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer -fsanitize=address \
-  workload_c.cpp -o build/workload_asan
-
-mkdir -p results/smoke
-for mode in plain asan; do
-  prefix="results/smoke/workload.$mode"
-  "./build/workload_$mode" 100000 1024 > "$prefix.stdout.txt" 2> "$prefix.stderr.txt"
-  printf '%s\n' "$?" > "$prefix.exit.txt"
-done
-
-Both builds should exit with code 0, report iterations=100000, bytes_per_block=1024, and checksum=13056000000, and show no ASan error. Record actual commands, stdout, stderr, exit codes, and the checksum comparison in environment.md.
-
-Verification status and repository deliverables
-
-A local Linux/GCC feasibility check at the pinned revision produced the expected outputs and exit code 0 for both builds of all three benchmarks. Formal results require the group’s WSL/Clang logs and valid timing pairs.
-# AddressSanitizer Runtime Overhead — Partial Reproduction
-
-**Member 1:** 王一涵 (Wang Yihan), 1240012912  
-**Status:** WSL workload validation and Codespaces error demonstrations are recorded. Formal repeated timing data are pending.
-
-See [PAPER_REVIEW.md](PAPER_REVIEW.md) for Member 1's core-method summary, coverage review, and paper-to-experiment comparison. See [WORKLOAD_HANDOFF.md](WORKLOAD_HANDOFF.md) for the supplied sources and the existing benchmark script entry point.
-
-## Scope and workload selection
-
-This project asks how enabling AddressSanitizer (ASan) changes whole-process elapsed time for three selected C programs. It follows the baseline-versus-ASan comparison in **Figure 2** of Serebryany et al., *AddressSanitizer: A Fast Address Sanity Checker* (USENIX ATC 2012).
-
-The paper uses C/C++ benchmarks from **SPEC CPU2006**. Our group lacks access to a licensed copy, so we use the public LLVM test-suite Shootout programs listed below. This is a **partial reproduction**. The results apply to these programs, inputs, and the recorded WSL/Clang setup. The paper's reported 73% average slowdown is historical context.
-
-**Formal metric:** whole-process elapsed time in seconds. **Memory evaluation is deferred.** The paper's Table 1 uses `VmPeak` (peak virtual address space). Any Max RSS already logged by a script is peak resident memory and stays outside the formal results. Member 4's intentional-error demonstration is a separate deliverable.
-
-| Formal workload | Operation | Argument | Expected stdout |
+| Program | Operation | Argument | Expected stdout |
 | --- | --- | ---: | --- |
-| `ary3` | Integer-array accumulation | `1500000` | `1000 1500000000` |
-| `heapsort` | Heap sort | `8000000` | `0.999993` |
-| `matrix` | Integer-matrix multiplication | `3000000` | `3355 13320 17865 23575` |
+| ary3 | Integer-array accumulation | 1500000 | `1000 1500000000` |
+| heapsort | Heap sort | 8000000 | `0.999993` |
+| matrix | Integer-matrix multiplication | 3000000 | `3355 13320 17865 23575` |
 
-Member 3's `workload_c.cpp` is used for the WSL smoke test only. Its internal `elapsed_us` stays outside the formal timing analysis.
+| Source | SHA-256 |
+| --- | --- |
+| ary3.c | `451e15b91ce45d781d998a2575daa73b381e97c4fcdbc0ecdb924650b58f4192` |
+| heapsort.c | `ab2810d9868668a4d652eb380da68cb15d78c4c5b7325c99963e18b336959490` |
+| matrix.c | `ff3f6ef68db20d2c8afe516ea4123b5bef0bdbf3b73986941406ef5612b01a31` |
 
-## Setup and build
+The local LLVM dependency is ignored by Git. Recreate it at the fixed revision using the commands below, retaining `LICENSE.TXT` and component notices. [WORKLOAD_HANDOFF.md](WORKLOAD_HANDOFF.md) also describes the source package supplied to Member 3.
 
-Run from the group repository root in 64-bit Ubuntu under WSL. The clone commands assume a fresh dependency directory. If the checkout already exists, reuse it after verifying its revision and checking that the selected files are unmodified.
+## Environment and installation
+
+The benchmark validation environment recorded in [environment.md](environment.md) is WSL2, Ubuntu 24.04.5 LTS, x86_64, Ubuntu Clang 18.1.3, AMD Ryzen 7 8845H and approximately 15 GiB visible RAM. The heap demonstration has its own Codespaces environment record under `demo_results/environment.md`.
+
+The formal CSV contains local WSL-style paths and configuration labels. A separate contemporaneous formal-run environment/build snapshot is absent from the reviewed files. The listed validation environment provides context; exact formal-run host and executable provenance remain a reporting limitation.
+
+From the group repository root, install prerequisites and obtain the dependency. Clone into a fresh directory. If a checkout already exists, verify its revision and selected-file hashes before reusing it.
 
 ```bash
 sudo apt-get update
@@ -504,9 +73,9 @@ git -C third_party/llvm-test-suite checkout --detach \
 git -C third_party/llvm-test-suite rev-parse HEAD
 ```
 
-Use the pinned revision printed above and retain its source and license notices. Record the repository and upstream revisions, WSL/Ubuntu version, CPU, RAM, Clang version, timing tool version, compile commands, and ASan settings in `environment.md`.
+## Build both variants
 
-Use the same source, compiler, and optimization flags in each pair. The ASan build adds `-fsanitize=address`. The runtime profile disables leak detection and uses the installed runtime's defaults for the other options. Run the following in the same Bash session or repeat the exports before running either build.
+Run in Bash. Use identical common flags for both variants. C benchmarks use `clang`; the C++ smoke test uses `clang++`.
 
 ```bash
 export LC_ALL=C
@@ -521,115 +90,117 @@ src=third_party/llvm-test-suite/SingleSource/Benchmarks/Shootout
       "$src/$name.c" -o "build/plain/$name" -lm
     clang -std=c17 -O2 -g -fno-omit-frame-pointer -fsanitize=address \
       "$src/$name.c" -o "build/asan/$name" -lm
-
-    # Remove the LLVM test harness's exit-status marker from expected stdout.
     sed '/^exit 0$/d' "$src/$name.reference_output" > "expected/$name.stdout.txt"
   done
 )
 ```
 
-Proceed after the build block succeeds for all three programs.
+Continue after all six compilations succeed. The `exit 0` line removed from the reference files is an LLVM harness marker. The expected text files contain program stdout only.
 
-## Formal timing and validity
+## Formal measurement and validity
 
-1. Verify that both builds of each program exit successfully and match the expected output. Run at least one valid warm-up per program and build before collecting measured runs. Keep warm-up records outside the timing statistics.
-2. Collect **at least five valid baseline/ASan pairs per program** (at least 30 valid measured executions in total, plus warm-ups). Run fresh processes sequentially on the same machine. Alternate the order of the two builds across pairs.
-3. A measured run is valid when its exit code is `0`, stdout exactly matches the upstream reference for the fixed input, stderr contains no ASan error report, and the recorded whole-process elapsed time is finite and positive. Both runs must pass for the pair to count. Save failed attempts with reasons and collect replacement pairs. Retain slow runs that meet the validity criteria.
-4. Record the program, input, mode, pair and attempt IDs, order, warm-up status, exact command, stdout, stderr, exit code, output comparison status, elapsed seconds, and validity or exclusion reason. Use a separate log prefix per execution. The script and Excel sheet should use the same definitions.
-5. Check timer resolution in the pilot. If GNU `time` rounds observations to zero or gives too little resolution for the workloads, use the same higher-resolution whole-process timer for the entire formal data set and document it in `environment.md`.
-
-Example for one measured execution. Run in Bash with `errexit` disabled so that a failing process or comparison still has its exit status logged. For the initial checks or warm-ups, use different log prefixes and leave them out of the summary.
+Run the implemented script from the repository root after compilation.
 
 ```bash
-mkdir -p results/formal
-prefix=results/formal/ary3.pair01.attempt01.plain
-/usr/bin/time -f 'elapsed_s=%e' -o "$prefix.time.txt" \
-  ./build/plain/ary3 1500000 > "$prefix.stdout.txt" 2> "$prefix.stderr.txt"
-printf '%s\n' "$?" > "$prefix.exit.txt"
-diff -u expected/ary3.stdout.txt "$prefix.stdout.txt" > "$prefix.diff.txt"
-printf '%s\n' "$?" > "$prefix.compare-exit.txt"
+bash scripts/run_benchmark.sh --runs 5 --output results/formal_run02/formal_runs.csv
 ```
 
-For each program, report valid pair count `n` and **mean ± sample standard deviation** of elapsed seconds for each build. Compute the ratio for each valid pair, then summarize the ratios for that program. A ratio above 1 indicates longer elapsed time with ASan. Keep the three programs' results separate.
+This example uses a fresh output directory. Choose another new parent directory if it already exists, because log filenames repeat within a parent directory. The root-level `run_benchmark.sh` in the reviewed snapshot contains only whitespace. Use the script under `scripts/`.
 
-```text
-ratio_i = ASan elapsed seconds_i / baseline elapsed seconds_i
-runtime overhead (%) = 100 × (mean of paired ratios − 1)
-sample SD denominator = n − 1
-```
+The script fixes the three inputs above and `ASAN_OPTIONS=detect_leaks=0`. It runs each program/mode once as a validated warm-up, then collects at least five valid pairs per program in fresh sequential processes. Execution order alternates across pair attempts. Failed attempts and their logs are retained, with a bounded retry limit.
 
-Report the paired ratios as mean ± sample SD. If reporting the spread of overhead percentages, use 100 times the ratio SD, in percentage points.
+A valid run has exit code 0, stdout identical to its reference, no ASan error report, and finite positive elapsed time. The current script also requires a numeric Max RSS value from GNU time. Both variants must pass for a pair to enter statistics. Warm-ups and invalid pairs are excluded. Slow valid runs are retained.
 
-## Custom workload smoke test
+GNU `/usr/bin/time` supplies whole-process elapsed seconds (`%e`) and peak resident memory in KiB (`%M`). Pilot runs should check its printed precision. Use a consistently documented higher-resolution timer if the workload is too short. The uploaded data use GNU time values printed to hundredths of a second.
 
-On the same WSL setup, compile and run Member 3's `workload_c.cpp` once per build using the common environment settings above.
+For future collections, save actual OS/CPU/RAM details, compiler/runtime version, source and executable hashes, repository/upstream revisions, exact build/run commands, and runtime options with the run records.
+
+## Formal runtime results
+
+Reviewed data are [formal_runs.csv](formal_runs.csv) and [formal_logs.zip](formal_logs.zip), committed in repository snapshot `94f6473023d92bc1be71cdfe07589e7e679d7e9b`.
+
+The CSV contains 72 rows describing 36 executions. Each execution has a time row and a supplementary RSS row. Six executions are warm-ups and 30 are measured runs, forming five valid pairs for each program. Corresponding stdout, stderr, exit, diff and metrics files were cross-checked against the CSV. All recorded outputs match the references, exits are 0, stderr files are empty, and metric values agree.
+
+| Program | Valid pairs | Baseline seconds, mean ± SD | ASan seconds, mean ± SD | Paired ratio, mean ± SD | Overhead |
+| --- | ---: | --- | --- | --- | ---: |
+| ary3 | 5 | 0.322 ± 0.004 | 2.152 ± 0.013 | 6.684 ± 0.086 | 568.41% |
+| heapsort | 5 | 1.444 ± 0.009 | 2.180 ± 0.012 | 1.510 ± 0.011 | 50.97% |
+| matrix | 5 | 0.524 ± 0.009 | 1.642 ± 0.011 | 3.134 ± 0.065 | 213.44% |
+
+For each program, let `r_i = ASan_time_i / baseline_time_i`. The displayed ratio is the arithmetic mean of the five paired ratios. Overhead is `100 × (mean(r) − 1)`. All SD values use the sample denominator `n − 1`. Pairing uses program, pair ID and attempt. Times are seconds and ratios are dimensionless.
+
+For an analysis of the script's CSV, select `claim_id=C1`, `measurement_kind=time`, `phase=measured`, `valid=true`, and `pair_valid=true`. CSV absolute paths identify the producer's machine. Locate the corresponding archived log by its basename under `formal_logs/` in the ZIP.
+
+### Supplementary resident memory
+
+| Program | Baseline Max RSS, KiB, mean ± SD | ASan Max RSS, KiB, mean ± SD |
+| --- | --- | --- |
+| ary3 | 14031.2 ± 30.6 | 18725.6 ± 30.8 |
+| heapsort | 64804.8 ± 7.2 | 75796.8 ± 91.9 |
+| matrix | 2416.0 ± 43.4 | 5876.0 ± 57.2 |
+
+These values summarize the five measured RSS observations per variant. VmPeak fields are empty. Virtual address-space reservations and resident-memory use describe different quantities. Table 1's VmPeak increase remains unevaluated in this project.
+
+## Detection demonstrations and smoke tests
+
+Member 2's `asan_test.cpp` and `asan_test.log` record a stack-buffer-overflow smoke test. The custom workload at input `100000 1024` produced checksum `13056000000` in both builds, as recorded under `results/smoke/` and in `environment.md`.
+
+To repeat the custom smoke test after creating `build/`, use the same environment settings as above and retain commands, stdout, stderr and exits.
 
 ```bash
 clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer \
   workload_c.cpp -o build/workload_plain
 clang++ -std=c++17 -O2 -g -fno-omit-frame-pointer -fsanitize=address \
   workload_c.cpp -o build/workload_asan
-
-mkdir -p results/smoke
-for mode in plain asan; do
-  prefix="results/smoke/workload.$mode"
-  "./build/workload_$mode" 100000 1024 > "$prefix.stdout.txt" 2> "$prefix.stderr.txt"
-  printf '%s\n' "$?" > "$prefix.exit.txt"
-done
+./build/workload_plain 100000 1024
+./build/workload_asan 100000 1024
 ```
 
-Both builds should exit with code `0`, report `iterations=100000`, `bytes_per_block=1024`, and `checksum=13056000000`, and show no ASan error. Record actual commands, stdout, stderr, exit codes, and the checksum comparison in `environment.md`.
+The custom internal `elapsed_us` values stay outside the formal kernel summary.
 
-## Verification status and repository deliverables
+Member 4's heap demonstration was executed in GitHub Codespaces using Clang 18.1.3 and an `-O0` ASan build. Commands, runtime options and source identity are in [demo_results/environment.md](demo_results/environment.md). Expected outcomes and observations are documented separately in [demo_results/expected_vs_actual.md](demo_results/expected_vs_actual.md).
 
-The repository records WSL/Clang validation of all three programs in both modes in `environment.md` and `results/check/`. Each recorded run matches its reference output with exit and comparison codes 0. Codespaces heap-overflow demonstrations are recorded in `demo_results/`. Formal repeated timing data remain pending in the reviewed repository snapshot.
+| Index | Repetitions | Recorded exits | Observed ASan outcome |
+| --- | ---: | --- | --- |
+| 0 | 3 | 0, 0, 0 | No report |
+| 15 | 3 | 0, 0, 0 | No report |
+| 16 | 3 | 1, 1, 1 | heap-buffer-overflow |
+| 17 | 3 | 1, 1, 1 | heap-buffer-overflow |
 
-| Member | Repository deliverable |
+All 12 recorded cases match their predefined expectations. Raw logs are under `demo_results/logs/`. The Codespaces demonstration supports detection behavior for these cases; its timing is separate from the WSL benchmark profile. The current `member4_run_demo.sh` can reproduce the demonstration, subject to its documented environment and output handling.
+
+## Comparison with the original paper
+
+The paper reports 73% average slowdown on SPEC CPU2006. Our paired ratios show strongly program-dependent overhead on the selected kernels, with ary3 highest and heapsort lowest. These observations establish overhead for the recorded runs. Differences in workload, input, compiler, host, runtime settings and timing method limit numerical comparison with the paper's suite average.
+
+The paper's evaluation used 64-bit Linux on an HP Z600 with two quad-core Xeon E5620 CPUs and 24 GB RAM. Its reported performance configuration included 32-byte redzones, disabled allocation/free stack unwinding and zero quarantine. Our fixed profile disables leak detection and otherwise relies on the installed runtime's defaults.
+
+Shadow checks, access patterns, compiler transformations and runtime behavior may contribute to different overheads. The present measurements do not isolate their individual effects. The project also lacks the paper's application-scale deployment evaluation, use-after-free coverage, global-error demonstrations and runtime-configuration sweep.
+
+## Repository files and responsibilities
+
+| File or directory | Purpose |
 | --- | --- |
-| 1 — 王一涵 | This `README.md` in the repository root, with the final workload selection, protocol, and validity criteria |
-| 2 — 蔡湘敏 | WSL setup and actual custom-workload smoke-test records in `environment.md` |
-| 3 — 郭奕帆 | Timing script and its invocation, raw run records, Excel summary, and `.gitignore` entries for generated builds and the local LLVM checkout |
-| 4 — 陈婉仪 | Separate demonstration source and actual logs for indices `0`, `15`, `16`, and `17`, with at least three runs each and expected and observed outputs recorded separately |
+| `README.md` | Current consolidated scope, commands and measured results |
+| `PAPER_REVIEW.md` | Member 1's paper summary, coverage and result comparison |
+| `WORKLOAD_HANDOFF.md` | Source handoff and program inputs |
+| `environment.md` | Contributed WSL setup and validation records |
+| `scripts/run_benchmark.sh` | Formal collection entry point |
+| `formal_runs.csv`, `formal_logs.zip` | Uploaded measured data and raw logs |
+| `ASan_Benchmark_and_Logging_Templates_Member3_Final.xlsx` | Current named workbook/template; numerical results here are recalculated from CSV |
+| `expected/`, `results/check/`, `results/smoke/` | References, validation and smoke records |
+| `demo_results/`, `extension_plan.md` | Codespaces functional demonstration records and plan |
+| `third_party/llvm-test-suite/`, `build/` | Reconstructible local dependency and generated executables, ignored by Git |
+
+| Member | Responsibility |
+| --- | --- |
+| 1 — 王一涵 | Paper interpretation, final scope, workload selection, paper-to-experiment comparison and result discussion |
+| 2 — 蔡湘敏 | Environment configuration, test-code checks, diagnostic validation and environment/run records |
+| 3 — 郭奕帆 | Formal experiment collection, raw logs, data tables and initial analysis |
+| 4 — 陈婉仪 | Extension/demonstration experiments and repository integration |
 
 ## References
 
-- Serebryany et al., *AddressSanitizer: A Fast Address Sanity Checker*, Section 4 and Figure 2. [Paper page](https://www.usenix.org/conference/atc12/technical-sessions/presentation/serebryany)
+- Serebryany et al. *AddressSanitizer: A Fast Address Sanity Checker*, USENIX ATC 2012, Sections 3–4, Figure 2 and Table 1. [Original paper](https://www.usenix.org/system/files/conference/atc12/atc12-final39.pdf)
+- LLVM test-suite. [Pinned Shootout source directory](https://github.com/llvm/llvm-test-suite/tree/d3f64b96fe6176716771a2e172f799caf1239b5b/SingleSource/Benchmarks/Shootout)
 - SPEC. [CPU2006 licensing notices](https://www.spec.org/cpu2006/docs/legal.html)
-- LLVM test-suite. [Pinned Shootout sources and reference outputs](https://github.com/llvm/llvm-test-suite/tree/d3f64b96fe6176716771a2e172f799caf1239b5b/SingleSource/Benchmarks/Shootout) · [License](https://github.com/llvm/llvm-test-suite/blob/d3f64b96fe6176716771a2e172f799caf1239b5b/LICENSE.TXT)
-
-## Formal script entry point
-
-After compilation and validation, run `bash scripts/run_benchmark.sh --runs 5 --output results/formal/formal_runs.csv`. Use a fresh output path for each data set and a separate parent directory to preserve its logs. The root-level `run_benchmark.sh` contains only whitespace in the reviewed snapshot. The script also records supplementary Max RSS, with VmPeak left blank. For the formal timing analysis select rows with `claim_id=C1`, `measurement_kind=time`, `phase=measured`, `valid=true`, and `pair_valid=true`.
-
-## Member 4: Extension Experiment — ASan Error Detection Demonstration
-
-### 1. Purpose
-
-This supplementary experiment demonstrates whether AddressSanitizer (ASan) can detect heap-buffer-overflow errors caused by out-of-bounds reads.
-
-The program allocates a heap array containing exactly 16 integers and tests four access indices: 0, 15, 16, and 17.
-
-### 2. Test Results
-
-Each test index was executed three times, resulting in 12 executions.
-
-| Test Index | Runs | Expected Result | Actual Result |
-|---|---:|---|---|
-| 0 | 3 | Valid access | No error detected |
-| 15 | 3 | Valid access | No error detected |
-| 16 | 3 | Heap-buffer-overflow | Heap-buffer-overflow |
-| 17 | 3 | Heap-buffer-overflow | Heap-buffer-overflow |
-
-All observed results matched the expected outcomes.
-
-### 3. Execution Environment
-
-The recorded demonstration was executed in GitHub Codespaces using a cloud-based Linux x86_64 environment, not on a local WSL machine.
-
-### 4. How to Reproduce
-
-Run the following command from the repository root:
-
-```bash
-bash member4_run_demo.sh
-```
